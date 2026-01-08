@@ -37,6 +37,8 @@ defmodule PaymentApi.Payments.Transaction do
       :customer_ip,
       :payment_method,
       :description,
+      :fraud_score,
+      :fraud_flags,
       :metadata
     ])
     |> validate_required([:amount, :currency, :status, :customer_email, :payment_method])
@@ -79,10 +81,21 @@ defmodule PaymentApi.Payments.Transaction do
     refund_amount = get_field(changeset, :refuned_amount)
     original_amount = get_field(changeset, :amount)
 
-    if Decimal.compare(refund_amount, original_amount) == :gt do
-      add_error(changeset, :refunded_amount, "cannot exceed original transaction amount")
-    else
-      changeset
+    # Handle nil refund_amount
+
+    cond do
+      is_nil(refund_amount) ->
+        changeset
+
+      is_nil(original_amount) ->
+        changeset
+
+      Decimal.compare(refund_amount, original_amount) == :gt ->
+        add_error(changeset, :refunded_amount, "cannot exceed original transaction amount")
+
+
+      true ->
+        changeset
     end
   end
 

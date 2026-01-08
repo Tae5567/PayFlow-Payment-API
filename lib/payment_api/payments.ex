@@ -4,25 +4,36 @@ defmodule PaymentApi.Payments do
   alias PaymentApi.Payments.{Transaction, FraudDetector, TransactionProcessor}
 
   def create_transaction(attrs) do
+    IO.inspect(attrs, label: "===== ATRRS BEFORE FRAUD CHECK =====")  # DEBUG LINE
+
     fraud_result = FraudDetector.analyze_transaction(attrs)
 
-    attrs =
-      attrs
-      |> stringify_keys()
-      |> Map.merge(%{
-        "fraud_score" => fraud_result.fraud_score,
-        "fraud_flags" => fraud_result.fraud_flags
-      })
+    IO.inspect(fraud_result, label: "===== FRAUD RESULT =====")  # DEBUG LINE
 
-  changeset = Transaction.changeset(%Transaction{}, attrs)
 
-  case Repo.insert(changeset) do
-    {:ok, transaction} ->
-      TransactionProcessor.process_async(transaction.id)
-      {:ok, transaction}
+    #Convert to strings first
+    attrs = stringify_keys(attrs)
 
-    {:error, changeset} ->
-      {:error, changeset}
+    #Then merge fraud data
+    attrs_with_fraud = Map.merge(attrs, %{
+      "fraud_score" => fraud_result.fraud_score,
+      "fraud_flags" => fraud_result.fraud_flags
+    })
+
+    IO.inspect(attrs_with_fraud, label: "===== ATRRS AFTER MERGE =====")  # DEBUG LINE
+
+    changeset = Transaction.changeset(%Transaction{}, attrs_with_fraud)
+
+     IO.inspect(changeset, label: "===== CHANGESET CHANGES =====")  # DEBUG LINE
+
+    case Repo.insert(changeset) do
+      {:ok, transaction} ->
+        IO.puts("======= CALLING PROCESS_ASYNC FOR: #{transaction.id} =======")  # DEBUG LINE
+        TransactionProcessor.process_async(transaction.id)
+        {:ok, transaction}
+
+      {:error, changeset} ->
+        {:error, changeset}
     end
   end
 
@@ -66,7 +77,7 @@ defmodule PaymentApi.Payments do
   end
 
   defp parse_amount(nil), do: nil
-  defp parse_ampount(amount) when is_binary(amount), do: Decimal.new(amount)
-  defp parse_ampunt(%Decimal{} = amount), do: amount
+  defp parse_amount(amount) when is_binary(amount), do: Decimal.new(amount)
+  defp parse_amount(%Decimal{} = amount), do: amount
   defp parse_amount(amount) when is_number(amount), do: Decimal.new(amount)
 end

@@ -4,15 +4,15 @@ defmodule PaymentApi.Payments.TransactionProcessor do
   require Logger
 
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__,opts, name: __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   def process_async(transaction_id) do
-    GenServer.start_link(__MODULE__, {:process, transaction_id})
+    GenServer.cast(__MODULE__, {:process, transaction_id})
   end
 
   @impl true
-  def init (_opts) do
+  def init(_opts) do
     {:ok, %{processing: MapSet.new()}}
   end
 
@@ -27,9 +27,9 @@ defmodule PaymentApi.Payments.TransactionProcessor do
   end
 
   defp process_transaction(transaction_id) do
-    Logger.info("Processing transaction #{transaction_id}")
+    Logger.info("Processing transaction: #{transaction_id}")
 
-    #Simulate payment gateway processing
+    # Simulate payment gateway processing
     Process.sleep(2000)
 
     case Payments.get_transaction(transaction_id) do
@@ -38,7 +38,8 @@ defmodule PaymentApi.Payments.TransactionProcessor do
         Payments.update_transaction_status(transaction, new_status)
         Logger.info("Transaction #{transaction_id} #{new_status}")
 
-        {:error, _} -> Logger.error("Transaction #{transaction_id} not found")
+      {:error, _} ->
+        Logger.error("Transaction #{transaction_id} not found")
     end
   end
 end

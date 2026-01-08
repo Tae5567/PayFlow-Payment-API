@@ -1,3 +1,4 @@
+
 defmodule PaymentApi.Payments.FraudDetector do
   alias PaymentApi.Payments.Transaction
   alias PaymentApi.Repo
@@ -10,8 +11,20 @@ defmodule PaymentApi.Payments.FraudDetector do
     flags = []
     score = 0
 
-    {flags, score} = check_amount(attrs["amount"] || attrs[:amount], flags, score)
-    {flags, score} = check_velocity(attrs["customer_email"] || attrs[:customer_email], flags, score)
+    # Get amount from either string key or atom key
+    amount = get_amount(attrs)
+    email = attrs["customer_email"] || attrs[:customer_email]
+
+
+    #DEBUG
+    IO.inspect(attrs, label: "FRAUD CHECK ATTRS")
+    IO.inspect(amount, label: "FRAUD CHECK AMOUNT")
+    IO.inspect(@suspicious_amount_threshold, label: "THRESHOLD")
+
+    {flags, score} = check_amount(amount, flags, score)
+    {flags, score} = check_velocity(email, flags, score)
+
+    IO.inspect({flags, score}, label: "FRAUD CHECK RESULT")
 
     %{
       fraud_score: score,
@@ -20,11 +33,17 @@ defmodule PaymentApi.Payments.FraudDetector do
     }
   end
 
-  defp check_amount(nil, flags, score), do: {flags, score}
-
-  defp check_amount(amount, flags, score) when is_binary(amount) do
-    check_amount(Decimal.new(amount), flags, score)
+  # Helper to extract and convert amount
+  defp get_amount(attrs) do
+    case attrs["amount"] || attrs[:amount] do
+      nil -> nil
+      amount when is_binary(amount) -> Decimal.new(amount)
+      %Decimal{} = amount -> amount
+      amount when is_number(amount) -> Decimal.new(amount)
+    end
   end
+
+  defp check_amount(nil, flags, score), do: {flags, score}
 
   defp check_amount(amount, flags, score) do
     if Decimal.compare(amount, @suspicious_amount_threshold) == :gt do
